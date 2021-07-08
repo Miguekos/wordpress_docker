@@ -1,50 +1,56 @@
-version: '3.1'
-
+version: "3.0"
 services:
-  wordpress_kunte:
-    container_name: wordpress_kunte
-    image: wordpress
+  phpmyadmin:
+    image: phpmyadmin
     restart: always
     ports:
-      - 8000:80
-    # environment:
-    #   WORDPRESS_DB_HOST: db
-    #   WORDPRESS_DB_USER: exampleuser
-    #   WORDPRESS_DB_PASSWORD: examplepass
-    #   WORDPRESS_DB_NAME: exampledb
-    volumes:
-      - ./wordpress_kunte:/var/www/html
-
-  wordpress_cuba:
-    container_name: wordpress_cuba
-    image: wordpress
-    restart: always
-    ports:
-      - 9000:80
-    # environment:
-    #   WORDPRESS_DB_HOST: db
-    #   WORDPRESS_DB_USER: exampleuser
-    #   WORDPRESS_DB_PASSWORD: examplepass
-    #   WORDPRESS_DB_NAME: exampledb
-    volumes:
-      - ./wordpress_cuba:/var/www/html
-
-  db:
-    image: mysql:5.7
-    container_name: mysql_kunte
-    restart: always
-    command: --innodb_use_native_aio=0 --default-authentication-plugin=mysql_native_password
-    ports:
-      - 3306:3306
+      - ${PORT_phpmyadmin}:80
     environment:
-      # MYSQL_DATABASE: exampledb
-      # MYSQL_USER: exampleuser
-      # MYSQL_PASSWORD:  examplepass
-      # MYSQL_RANDOM_ROOT_PASSWORD: '1'
-      MYSQL_ROOT_PASSWORD: root
-    volumes:
-      - ./db:/var/lib/mysql
+      - PMA_ARBITRARY=1
 
-volumes:
+  filebrowser:
+    image: hurlenko/filebrowser
+    ports:
+      - ${PORT_FILE}:8080
+    volumes:
+      - /usr/local/volumes/${NAME}/wordpress_${NAME}/wordpress-core:/data
+    restart: always
+
+  mysql:
+    container_name: mysql_${NAME}
+    environment:
+      MYSQL_DATABASE: wordpress_${NAME}
+      MYSQL_PASSWORD: password
+      MYSQL_ROOT_PASSWORD: password
+      MYSQL_USER: root
+    image: mariadb:latest
+    restart: unless-stopped
+    volumes:
+      - /usr/local/volumes/${NAME}/mysql_${NAME}/:/var/lib/mysql:rw
+      
   wordpress:
-  db:
+    container_name: wordpress_${NAME}
+    depends_on:
+      - mysql
+    environment:
+      LETSENCRYPT_EMAIL: admin@admin.com
+      LETSENCRYPT_HOST: ${URL_1},${URL_2}
+      VIRTUAL_HOST: ${URL_1},${URL_2}
+      WORDPRESS_DB_HOST: mysql_${NAME}:3306
+      WORDPRESS_DB_NAME: wordpress_${NAME}
+      WORDPRESS_DB_PASSWORD: password
+      WORDPRESS_DB_USER: root
+      WORDPRESS_TABLE_PREFIX: wp_
+    image: wordpress:latest
+    logging:
+      options:
+        max-size: 200k
+    restart: unless-stopped
+    volumes:
+      - /usr/local/volumes/${NAME}/wordpress_${NAME}/wordpress-core:/var/www/html:rw
+      - ./conf.d/php.ini:/usr/local/etc/php/conf.d/php.ini:rw
+
+networks:
+  default:
+    external:
+      name: nginx-proxy_default
